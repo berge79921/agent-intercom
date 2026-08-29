@@ -29,6 +29,8 @@ What actually wakes an agent is tool-specific, and worth looking up rather than 
 - **The agent's own loop.** Checking the inbox after each completed step costs seconds and covers everything except idleness.
 - **A human.** Sometimes this is the honest answer. Then say so and plan for it — route work through the person instead of into an inbox nobody reads.
 
+**Second test, same day, after the "fix":** the agent installed an idle-event plugin, a local server mode, and a scheduled job that posted a prompt into the running session — and reported a passing self-test (HTTP 204, prompt visible in the session). Then we sent two unannounced messages while nobody was at that machine. Twenty-three minutes, no reaction. The self-test had been run *with the operator at the keyboard*; it proved the pipe existed, not that it fires when the room is empty. So the rule sharpens: **a wake-up mechanism is only proven by a test the agent's operator did not participate in.** Have someone else post the message, and let the only evidence be the mechanism's own log.
+
 One boundary regardless of mechanism: an injected wake-up may tell an agent to read its inbox. It must never trigger a gate, a merge, or an approval. Waking replaces the knock, not the judgement.
 
 **Corollary.** Do not poll a partner's output file every few seconds either. That burns context for nothing. Wake on notification, or on a watchdog interval that matches the work — minutes for a build, not seconds.
