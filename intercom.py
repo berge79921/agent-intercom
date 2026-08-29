@@ -14,7 +14,8 @@ ROOT = os.environ.get("INTERCOM_ROOT") or os.path.dirname(os.path.abspath(__file
 CONFIG_PATH = os.path.join(ROOT, "intercom.json")
 DEFAULT_CONFIG = {"roles": ["human", "lead", "builder", "verifier"], "branch": "intercom",
                   "remote": "origin", "extra_remotes": [], "silence_alert_minutes": 60,
-                  "heartbeat_alert_minutes": 20, "auto_ping_cooldown_minutes": 30,
+                  "heartbeat_alert_minutes": 45, "auto_ping_cooldown_minutes": 30,
+                  "human_roles": ["human"],
                   "activity_sources": {}}
 
 def load_config():
@@ -207,8 +208,9 @@ def cmd_watch(a):
             watch_state["last_peer_check"] = time.time()
             limit = CONFIG.get("heartbeat_alert_minutes", 20)
             all_msgs = all_messages()
+            parked = standby_roles() | set(CONFIG.get("human_roles", []))
             for other in ROLES[:-1]:
-                if other == a.role:
+                if other == a.role or other in parked:
                     continue
                 ts, kind = role_activity(other, all_msgs)
                 quiet = minutes_since(ts) if ts else None
@@ -258,6 +260,25 @@ def cmd_lock(a):
         commit(["locks", "LOCKS.md"], f"unlock({a.holder}): {a.resource}")
         sync()
         print("RELEASED")
+
+def standby_path():
+    return os.path.join(ROOT, "state", "standby.json")
+
+def standby_roles():
+    try:
+        return set(json.load(open(standby_path(), encoding="utf-8")).get("roles", []))
+    except Exception:
+        return set()
+
+def cmd_standby(a):
+    """Mark a role as having no running assignment — it will not be pinged while quiet."""
+    roles = standby_roles()
+    roles.discard(a.role) if a.off else roles.add(a.role)
+    json.dump({"roles": sorted(roles)}, open(standby_path(), "w", encoding="utf-8"), indent=1)
+    sync(push=False)
+    commit(["state"], f"standby({a.role}): {'off' if a.off else 'on'}")
+    sync()
+    print(f"standby {'off' if a.off else 'on'} for {a.role}; currently: {', '.join(sorted(roles)) or '-'}")
 
 def heartbeat_path(role):
     return os.path.join(ROOT, "state", f"heartbeat-{role}.json")
@@ -365,8 +386,12 @@ def cmd_peers(a):
     msgs = all_messages()
     limit = a.quiet_min if a.quiet_min >= 0 else CONFIG.get("heartbeat_alert_minutes", 20)
     stale = False
+    parked = standby_roles() | set(CONFIG.get("human_roles", []))
     for role in ROLES[:-1]:
         if role == a.me:
+            continue
+        if role in parked:
+            print(f"parked {role}: no running assignment / human role (never auto-pinged)")
             continue
         ts, kind = role_activity(role, msgs)
         if ts is None:
@@ -463,6 +488,7 @@ def main():
     p = sub.add_parser("render"); p.set_defaults(fn=lambda a: (sync(push=False), render(), commit(["INBOX-*.md", "LOCKS.md"], "render"), sync()))
     p = sub.add_parser("sync"); p.set_defaults(fn=lambda a: sync())
     p = sub.add_parser("heartbeat", help="record that this role is alive and working"); p.add_argument("role"); p.add_argument("--note", default=""); p.add_argument("--local", action="store_true", help="write only, do not commit/push"); p.set_defaults(fn=cmd_heartbeat)
+    p = sub.add_parser("standby", help="park a role: quiet is expected, do not ping it"); p.add_argument("role"); p.add_argument("--off", action="store_true"); p.set_defaults(fn=cmd_standby)
     p = sub.add_parser("peers", help="who is alive? exit 1 if anyone is quiet"); p.add_argument("--me", default=""); p.add_argument("--quiet-min", type=int, default=-1); p.add_argument("--auto-ping", action="store_true"); p.set_defaults(fn=cmd_peers)
     p = sub.add_parser("due", help="list overdue / unanswered messages and silent roles"); p.add_argument("--silence-min", type=int, default=0); p.add_argument("--unanswered-min", type=int, default=0); p.add_argument("-v", "--verbose", action="store_true"); p.set_defaults(fn=cmd_due)
     p = sub.add_parser("init", help="create intercom.json in this directory"); p.add_argument("--roles", default="human,lead,builder,verifier"); p.add_argument("--branch", default="intercom"); p.add_argument("--remote", default="origin"); p.add_argument("--extra-remotes", default=""); p.add_argument("--silence-min", type=int, default=60); p.set_defaults(fn=cmd_init)
