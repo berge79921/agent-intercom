@@ -52,6 +52,7 @@ That is the whole protocol. Because it is git, you get history, blame, offline w
 | `inbox <role> [--open]` | what is addressed to this role; `--open` = still needs an answer |
 | `watch <role>` | long-running wake-up loop; prints one line per new message. `--peers-every N` also watches the other roles, `--auto-ping` wakes them |
 | `heartbeat <role> --note "..."` | cheap "I am alive and working on X" — a file, not a message |
+| `standby <role> [--off]` | park a role: quiet is expected, do not wake it |
 | `peers --me <role>` | who is alive? one line per role, exit 1 if anyone is quiet; `--auto-ping` sends the wake-up |
 | `due` | **watchdog**: overdue deadlines, unanswered messages, roles that went silent |
 | `lock acquire\|release\|list` | claim a worktree/branch/resource so two agents cannot touch it at once |
@@ -114,7 +115,8 @@ python3 intercom.py lock acquire ~/worktree-api --holder builder --purpose "JIRA
   "remote": "origin",
   "extra_remotes": ["backup"],
   "silence_alert_minutes": 60,
-  "heartbeat_alert_minutes": 20,
+  "heartbeat_alert_minutes": 45,
+  "human_roles": ["human"],
   "auto_ping_cooldown_minutes": 30,
   "activity_sources": { "verifier": { "repo": "/path/to/repo", "refs": ["origin/verify"] } }
 }
