@@ -1,0 +1,12 @@
+{
+  "roles": [
+    "human",
+    "lead",
+    "builder",
+    "verifier"
+  ],
+  "branch": "intercom",
+  "remote": "origin",
+  "extra_remotes": [],
+  "silence_alert_minutes": 60
+}
