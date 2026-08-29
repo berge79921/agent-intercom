@@ -12,6 +12,11 @@ Everything here was paid for once. It comes from running a lead agent, a builder
 
 **The rule.** Every agent team needs a watchdog that fires on **absence**: deadline passed, message unanswered for N minutes, role silent for N minutes. `intercom.py due` does this and exits 1 when something needs attention — put it in cron, a git hook, or your agent's own monitor loop. Also give every delegated task an explicit deadline and check it; a time box nobody watches is a wish.
 
+**Two refinements we had to add afterwards, both from the same night:**
+
+- **Watching the message channel is not watching the agent.** Our partner agent was quiet for hours — and had been working the whole time, pushing commits to its own branch without writing a single message. A watchdog that only reads the channel reports that agent as dead; one that also checks the branches it moves reports the truth. Hence `activity_sources`: a role counts as alive if it sent a heartbeat, posted a message, **or** moved a git ref you told the tool to track.
+- **One watchdog on the coordinator is not enough.** The lead is exactly the agent that will be deep in something else when a partner stalls. Every agent's wake-up loop should watch the others (`watch <role> --peers-every 15 --auto-ping`) and send the wake-up itself. Cheap insurance: a `heartbeat` is one file write, and the auto-ping has a cooldown so a silent role gets one message per episode, not a storm.
+
 **Corollary.** Do not poll a partner's output file every few seconds either. That burns context for nothing. Wake on notification, or on a watchdog interval that matches the work — minutes for a build, not seconds.
 
 ---

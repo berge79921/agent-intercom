@@ -6,8 +6,19 @@ The CLI is `python3 <INTERCOM_DIR>/intercom.py`. Your role is `<YOUR_ROLE>`.
 ## At session start, always
 1. `intercom.py inbox <YOUR_ROLE> --open` — what you owe an answer to.
 2. `intercom.py lock list` — what is claimed, including stale locks of your own (release those).
-3. Start your wake-up loop: `intercom.py watch <YOUR_ROLE>` (or `--once` from a hook/cron).
-   **Without a wake-up loop you will never learn that work arrived.**
+3. Start your wake-up loop, and watch your partners while you are at it:
+   `intercom.py watch <YOUR_ROLE> --peers-every 15 --auto-ping` (or `--once` from a hook/cron).
+   **Without a wake-up loop you will never learn that work arrived** — and without `--peers-every`
+   nobody notices when a partner stalls.
+
+## While you work
+Send a heartbeat whenever you start something and every ~15 minutes during long work:
+```bash
+intercom.py heartbeat <YOUR_ROLE> --note "building the retry path"
+```
+It is one file write, no message traffic. It is what keeps the others from waking you — and,
+more importantly, it is how they can tell "working" from "crashed". An agent that never
+heartbeats will be pinged, and rightly so.
 
 ## Writing messages
 - Bodies go in a file, never on the command line:

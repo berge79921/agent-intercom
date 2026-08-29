@@ -50,7 +50,9 @@ That is the whole protocol. Because it is git, you get history, blame, offline w
 | `post` | write a message, render inboxes, commit, push |
 | `ack` | acknowledge a message that required one |
 | `inbox <role> [--open]` | what is addressed to this role; `--open` = still needs an answer |
-| `watch <role>` | long-running wake-up loop; prints one line per new message |
+| `watch <role>` | long-running wake-up loop; prints one line per new message. `--peers-every N` also watches the other roles, `--auto-ping` wakes them |
+| `heartbeat <role> --note "..."` | cheap "I am alive and working on X" — a file, not a message |
+| `peers --me <role>` | who is alive? one line per role, exit 1 if anyone is quiet; `--auto-ping` sends the wake-up |
 | `due` | **watchdog**: overdue deadlines, unanswered messages, roles that went silent |
 | `lock acquire\|release\|list` | claim a worktree/branch/resource so two agents cannot touch it at once |
 | `render` / `sync` | regenerate `INBOX-*.md`/`LOCKS.md`, or just fetch/push |
@@ -78,7 +80,23 @@ python3 intercom.py watch builder --once          # for cron / hooks
 python3 intercom.py due --silence-min 45          # exit code 1 when something needs attention
 ```
 
-**4. Lock before you touch shared state.**
+**4. Let the agents watch each other.** One watchdog on the lead is not enough — the lead is exactly the agent that will be busy when a partner stalls. Every agent's wake-up loop can watch the others:
+
+```bash
+python3 intercom.py watch builder --peers-every 15 --auto-ping   # watches its own inbox AND the other roles
+python3 intercom.py heartbeat builder --note "refactor upload path"  # call this while you work
+python3 intercom.py peers --me lead                              # one-off: who is alive?
+```
+
+A role counts as alive if it sent a heartbeat, posted a message, or moved a git ref you told the tool to track:
+
+```json
+"activity_sources": { "verifier": { "repo": "/path/to/repo", "refs": ["origin/verify"] } }
+```
+
+That last part matters: an agent can be working hard and saying nothing. Watching only the message channel reports it as dead; watching its branch tells the truth. When a role does go quiet, `--auto-ping` sends exactly one wake-up message per silence episode (cooldown configurable), so a stall is noticed in minutes instead of hours — by whichever agent notices first, not only by the lead.
+
+**5. Lock before you touch shared state.**
 
 ```bash
 python3 intercom.py lock acquire ~/worktree-api --holder builder --purpose "JIRA-812 retry"
@@ -95,7 +113,10 @@ python3 intercom.py lock acquire ~/worktree-api --holder builder --purpose "JIRA
   "branch": "intercom",
   "remote": "origin",
   "extra_remotes": ["backup"],
-  "silence_alert_minutes": 60
+  "silence_alert_minutes": 60,
+  "heartbeat_alert_minutes": 20,
+  "auto_ping_cooldown_minutes": 30,
+  "activity_sources": { "verifier": { "repo": "/path/to/repo", "refs": ["origin/verify"] } }
 }
 ```
 
