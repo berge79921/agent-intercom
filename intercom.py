@@ -13,7 +13,9 @@ def local_hm(ts_iso):
 ROOT = os.environ.get("INTERCOM_ROOT") or os.path.dirname(os.path.abspath(__file__))
 CONFIG_PATH = os.path.join(ROOT, "intercom.json")
 DEFAULT_CONFIG = {"roles": ["human", "lead", "builder", "verifier"], "branch": "intercom",
-                  "remote": "origin", "extra_remotes": [], "silence_alert_minutes": 60}
+                  "remote": "origin", "extra_remotes": [], "silence_alert_minutes": 60,
+                  "heartbeat_alert_minutes": 20, "auto_ping_cooldown_minutes": 30,
+                  "activity_sources": {}}
 
 def load_config():
     cfg = dict(DEFAULT_CONFIG)
@@ -180,7 +182,12 @@ def state_path(role):
     return os.path.join(ROOT, "state", f"{role}.json")
 
 def cmd_watch(a):
-    """Wake-up loop: prints one line per new message addressed to ROLE; --once for hooks/cron."""
+    """Wake-up loop: prints one line per new message addressed to ROLE; --once for hooks/cron.
+
+    With --peers-every N the same loop also watches the OTHER roles and reports
+    anyone who shows no sign of life; --auto-ping additionally sends them one
+    wake-up message per silence episode."""
+    watch_state = {"last_peer_check": 0.0}
     seen = set()
     if os.path.exists(state_path(a.role)):
         seen = set(json.load(open(state_path(a.role))).get("seen", []))
@@ -196,6 +203,20 @@ def cmd_watch(a):
             sync()
             if a.notify:
                 subprocess.run(["osascript", "-e", f'display notification "{len(msgs)} new intercom message(s)" with title "Intercom · {a.role}"'], check=False)
+        if a.peers_every and (time.time() - watch_state["last_peer_check"]) >= a.peers_every * 60:
+            watch_state["last_peer_check"] = time.time()
+            limit = CONFIG.get("heartbeat_alert_minutes", 20)
+            all_msgs = all_messages()
+            for other in ROLES[:-1]:
+                if other == a.role:
+                    continue
+                ts, kind = role_activity(other, all_msgs)
+                quiet = minutes_since(ts) if ts else None
+                if ts is None or (quiet is not None and quiet >= limit):
+                    label = f"{quiet}min since {kind}" if ts else "no sign of life at all"
+                    print(f"PEER-QUIET {other}: {label}", flush=True)
+                    if a.auto_ping:
+                        auto_ping(a.role, other, quiet or 0, kind if ts else "nothing")
         if a.once:
             return
         time.sleep(a.interval)
@@ -238,6 +259,131 @@ def cmd_lock(a):
         sync()
         print("RELEASED")
 
+def heartbeat_path(role):
+    return os.path.join(ROOT, "state", f"heartbeat-{role}.json")
+
+def read_heartbeat(role):
+    p = heartbeat_path(role)
+    if not os.path.exists(p):
+        return None
+    try:
+        return json.load(open(p, encoding="utf-8"))
+    except Exception:
+        return None
+
+def minutes_since(iso):
+    try:
+        return int((now_utc() - datetime.fromisoformat(iso)).total_seconds() // 60)
+    except Exception:
+        return None
+
+def role_activity(role, msgs):
+    """Newest sign of life for a role: heartbeat, own message, or a tracked git ref."""
+    best, kind = None, "nothing"
+    hb = read_heartbeat(role)
+    if hb and hb.get("ts"):
+        best, kind = hb["ts"], f"heartbeat ({hb.get('note', '')[:40]})" if hb.get("note") else "heartbeat"
+    own = [m for m in msgs if m["from"] == role]
+    if own:
+        ts = own[-1].get("ts")
+        if ts and (best is None or ts > best):
+            best, kind = ts, f"message {own[-1]['id']}"
+    src = CONFIG.get("activity_sources", {}).get(role)
+    if src:
+        # src: {"repo": "/path/to/repo", "refs": ["origin/feature-x", "origin/verify"]}
+        repo = src.get("repo", ROOT)
+        for ref in src.get("refs", []):
+            r = subprocess.run(["git", "-C", repo, "log", "-1", "--format=%cI", ref],
+                               capture_output=True, text=True)
+            ts = r.stdout.strip()
+            if r.returncode == 0 and ts:
+                try:
+                    ts = datetime.fromisoformat(ts).astimezone(timezone.utc).isoformat(timespec="seconds")
+                except ValueError:
+                    continue
+                if best is None or ts > best:
+                    best, kind = ts, f"commit on {ref}"
+    return best, kind
+
+def cmd_heartbeat(a):
+    """Say 'I am alive and working on X'. Cheap: writes a file, no message traffic."""
+    hb = {"role": a.role, "ts": now_utc().isoformat(timespec="seconds"), "note": a.note or ""}
+    json.dump(hb, open(heartbeat_path(a.role), "w", encoding="utf-8"), indent=1)
+    if not a.local:
+        sync(push=False)
+        commit(["state"], f"heartbeat({a.role})")
+        sync()
+    print(f"heartbeat {a.role} {hb['ts']}" + (f" — {hb['note']}" if hb["note"] else ""))
+
+def cooldown_path(role):
+    return os.path.join(ROOT, "state", f"autoping-{role}.json")
+
+def auto_ping(from_role, silent_role, quiet_min, kind):
+    """Post one ping per silence episode, never a storm."""
+    cd = {}
+    p = cooldown_path(from_role)
+    if os.path.exists(p):
+        try:
+            cd = json.load(open(p, encoding="utf-8"))
+        except Exception:
+            cd = {}
+    last = cd.get(silent_role)
+    limit = CONFIG.get("auto_ping_cooldown_minutes", 30)
+    if last and (minutes_since(last) or 0) < limit:
+        return False
+    body = (f"Automatic wake-up from {from_role}'s watchdog.\n\n"
+            + (f"No sign of life from `{silent_role}` at all — no heartbeat, no message, "
+               "no tracked commit.\n\n" if kind == "nothing at all" else
+               f"No sign of life from `{silent_role}` for {quiet_min} minutes "
+               f"(last signal: {kind}).\n\n")
+            + "Please answer in one line: are you working (on what), blocked, waiting for a decision, "
+            "or idle? If a prompt in your tool is waiting for confirmation, that looks exactly like "
+            "silence from here.\n\n"
+            + f"Send a heartbeat while you work so this does not fire again:\n"
+            f"  intercom.py heartbeat {silent_role} --note \"<what you are doing>\"")
+    tmp = os.path.join(ROOT, "state", ".autoping-body.md")
+    open(tmp, "w", encoding="utf-8").write(body)
+    try:
+        mid, _ = write_message(from_role, [silent_role], "ping",
+                               (f"Watchdog: no sign of life from {silent_role} at all" if kind == "nothing at all"
+                                else f"Watchdog: no sign of life from {silent_role} for {quiet_min} min"),
+                               body, needs_ack=True)
+        cd[silent_role] = now_utc().isoformat(timespec="seconds")
+        json.dump(cd, open(p, "w", encoding="utf-8"), indent=1)
+        render()
+        commit(["messages", "state"], f"watchdog({from_role}): ping {silent_role}")
+        sync()
+        print(f"AUTO-PING sent to {silent_role} ({mid})", flush=True)
+        return True
+    finally:
+        if os.path.exists(tmp):
+            os.remove(tmp)
+
+def cmd_peers(a):
+    """Who is alive? One line per role, newest sign of life and its kind."""
+    sync(push=False)
+    msgs = all_messages()
+    limit = a.quiet_min if a.quiet_min >= 0 else CONFIG.get("heartbeat_alert_minutes", 20)
+    stale = False
+    for role in ROLES[:-1]:
+        if role == a.me:
+            continue
+        ts, kind = role_activity(role, msgs)
+        if ts is None:
+            print(f"UNKNOWN {role}: no heartbeat, no message, no tracked commit")
+            stale = True
+            if a.auto_ping and a.me:
+                auto_ping(a.me, role, 0, "nothing at all")
+            continue
+        quiet = minutes_since(ts) or 0
+        flag = "QUIET  " if quiet >= limit else "alive  "
+        if quiet >= limit:
+            stale = True
+        print(f"{flag}{role}: {quiet}min since {kind}")
+        if quiet >= limit and a.auto_ping and a.me:
+            auto_ping(a.me, role, quiet, kind)
+    raise SystemExit(1 if stale else 0)
+
 def cmd_due(a):
     """Deadline and silence watchdog: prints only what needs action. Exit 1 if anything is due."""
     sync(push=False)
@@ -267,17 +413,14 @@ def cmd_due(a):
                   f" | age={age_min}min{' | deadline ' + dl if dl else ''}")
     limit = a.silence_min or CONFIG.get("silence_alert_minutes", 60)
     for role in ROLES[:-1]:
-        last = [m for m in msgs if m["from"] == role]
-        if not last:
-            print(f"SILENT {role}: never posted")
+        ts, kind = role_activity(role, msgs)
+        if ts is None:
+            print(f"SILENT {role}: no heartbeat, no message, no tracked commit")
             found = True
             continue
-        try:
-            quiet = int((now - datetime.fromisoformat(last[-1]["ts"])).total_seconds() // 60)
-        except Exception:
-            continue
-        if quiet >= limit:
-            print(f"SILENT {role}: {quiet}min since last message ({last[-1]['id']})")
+        quiet = minutes_since(ts)
+        if quiet is not None and quiet >= limit:
+            print(f"SILENT {role}: {quiet}min since {kind}")
             found = True
     if not found and a.verbose:
         print("nothing due")
@@ -315,10 +458,12 @@ def main():
     p = sub.add_parser("post"); p.add_argument("--from", dest="frm", required=True); p.add_argument("--to", required=True); p.add_argument("--type", required=True); p.add_argument("--subject", required=True); p.add_argument("--body"); p.add_argument("--body-file"); p.add_argument("--re"); p.add_argument("--needs-ack", action="store_true"); p.add_argument("--deadline"); p.add_argument("--refs", help="path@branch@commit; separate multiple with ;"); p.set_defaults(fn=cmd_post)
     p = sub.add_parser("ack"); p.add_argument("id"); p.add_argument("--from", dest="frm", required=True); p.add_argument("--note"); p.set_defaults(fn=cmd_ack)
     p = sub.add_parser("inbox"); p.add_argument("role"); p.add_argument("--open", action="store_true"); p.add_argument("-v", "--verbose", action="store_true"); p.set_defaults(fn=cmd_inbox)
-    p = sub.add_parser("watch"); p.add_argument("role"); p.add_argument("--interval", type=int, default=60); p.add_argument("--once", action="store_true"); p.add_argument("--notify", action="store_true"); p.set_defaults(fn=cmd_watch)
+    p = sub.add_parser("watch"); p.add_argument("role"); p.add_argument("--interval", type=int, default=60); p.add_argument("--once", action="store_true"); p.add_argument("--notify", action="store_true"); p.add_argument("--peers-every", type=int, default=0, metavar="MIN", help="also check the other roles every MIN minutes"); p.add_argument("--auto-ping", action="store_true", help="with --peers-every: send one wake-up message per silence episode"); p.set_defaults(fn=cmd_watch)
     p = sub.add_parser("lock"); p.add_argument("action", choices=["acquire", "release", "list"]); p.add_argument("resource", nargs="?", default=""); p.add_argument("--holder"); p.add_argument("--purpose", default=""); p.add_argument("--ttl-min", type=int, default=240); p.set_defaults(fn=cmd_lock)
     p = sub.add_parser("render"); p.set_defaults(fn=lambda a: (sync(push=False), render(), commit(["INBOX-*.md", "LOCKS.md"], "render"), sync()))
     p = sub.add_parser("sync"); p.set_defaults(fn=lambda a: sync())
+    p = sub.add_parser("heartbeat", help="record that this role is alive and working"); p.add_argument("role"); p.add_argument("--note", default=""); p.add_argument("--local", action="store_true", help="write only, do not commit/push"); p.set_defaults(fn=cmd_heartbeat)
+    p = sub.add_parser("peers", help="who is alive? exit 1 if anyone is quiet"); p.add_argument("--me", default=""); p.add_argument("--quiet-min", type=int, default=-1); p.add_argument("--auto-ping", action="store_true"); p.set_defaults(fn=cmd_peers)
     p = sub.add_parser("due", help="list overdue / unanswered messages and silent roles"); p.add_argument("--silence-min", type=int, default=0); p.add_argument("--unanswered-min", type=int, default=0); p.add_argument("-v", "--verbose", action="store_true"); p.set_defaults(fn=cmd_due)
     p = sub.add_parser("init", help="create intercom.json in this directory"); p.add_argument("--roles", default="human,lead,builder,verifier"); p.add_argument("--branch", default="intercom"); p.add_argument("--remote", default="origin"); p.add_argument("--extra-remotes", default=""); p.add_argument("--silence-min", type=int, default=60); p.set_defaults(fn=cmd_init)
     a = ap.parse_args()
