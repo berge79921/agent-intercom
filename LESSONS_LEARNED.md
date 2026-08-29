@@ -19,6 +19,18 @@ Everything here was paid for once. It comes from running a lead agent, a builder
 
 **And the correction we needed within the hour:** the first version of the mutual watchdog woke an agent we had dismissed hours earlier, and a verifier that was mid-run. A watchdog that cries wolf is worse than none — people mute it. So: park roles that have no running assignment (`standby <role>`), never auto-ping humans, and set the threshold to the longest *legitimate* quiet stretch of the slowest role (45 minutes for a verifier running a full suite, not 20). Alarm fatigue is a design failure, not a user failure.
 
+**And the part we only learned by testing it: making a stall *visible* is not *waking* anyone.** One agent set up a scheduled job that checked the channel every 15 minutes and raised a desktop notification when something was waiting. It worked — the notification appeared. Then we sent an unannounced test message during its work and measured: **50 minutes, no reaction.** The notification told the *human* that the agent was stuck; it never reached the agent. We had been one assumption away from believing the problem was solved.
+
+So: **test the wake-up path, unannounced, and measure.** Send a message at a moment nobody expects, require an answer with three values — when it arrived, when they reacted, which mechanism fired — and set a pass threshold (we use 15 minutes). "Woken by a human" is an honest fail and more useful than a flattering number. Repeat once, so you know it was not luck.
+
+What actually wakes an agent is tool-specific, and worth looking up rather than assuming:
+- **A hook on the idle event.** Some tools let a plugin subscribe to `session.idle` — exactly the state in which an agent is otherwise unreachable.
+- **A server mode that accepts an injected prompt.** If your tool can run as a local HTTP server with an endpoint that posts a message into a *running* session, an external watchdog can knock on the door rather than just ring a bell nobody hears.
+- **The agent's own loop.** Checking the inbox after each completed step costs seconds and covers everything except idleness.
+- **A human.** Sometimes this is the honest answer. Then say so and plan for it — route work through the person instead of into an inbox nobody reads.
+
+One boundary regardless of mechanism: an injected wake-up may tell an agent to read its inbox. It must never trigger a gate, a merge, or an approval. Waking replaces the knock, not the judgement.
+
 **Corollary.** Do not poll a partner's output file every few seconds either. That burns context for nothing. Wake on notification, or on a watchdog interval that matches the work — minutes for a build, not seconds.
 
 ---
