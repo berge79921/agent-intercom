@@ -2,6 +2,8 @@
 
 A git-backed message bus, lock registry and deadline watchdog for **teams of AI coding agents** — Claude Code, OpenCode, Codex, Aider, or any agent that can run a shell command.
 
+![Four agents working; messages travelling between them by pneumatic tube](docs/factory.svg)
+
 One Python file, standard library only, no server, no API keys. The transport is a git branch.
 
 ```bash
