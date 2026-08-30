@@ -105,7 +105,7 @@ That last part matters: an agent can be working hard and saying nothing. Watchin
 [agenttrail](https://github.com/sodiumsun/agenttrail) convention: one component per role
 (with its last sign of life), open items as tasks (`[ ]` unanswered, `[~]` acknowledged,
 `[x]` answered, `[!]` blocked), arrows from a role to the roles it is waiting on, and the
-last ten decisions. `board/board.sh` runs agenttrail on the intercom directory with this
+last ten decisions — and a `TIMELINE.md`: who talked to whom in the last seven days, in order, with the ack latency of every message that required one and a response-time table per role. `board/board.sh` runs agenttrail on the intercom directory with this
 repo's skin — factory palette and the mascot in the corner, which cheers while someone works:
 
 ```bash

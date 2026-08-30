@@ -130,6 +130,7 @@ Messages carry `refs: path@branch@commit`. The receiver reads the repository. Pa
 ## 11. Keep the channel clean
 
 - **Declare superseded work explicitly.** When a hand-off is replaced by a newer one, say so in one message listing what is now dead. Otherwise the next agent works from the wrong artefact.
+- **Look at the communication itself, not only the work.** `TIMELINE.md` (generated with every render) lists who talked to whom, in order, with the time each acknowledgement took. The first time we rendered it, one role's median time-to-ack was 211 minutes and the lead had 19 unacknowledged items — numbers nobody had felt, because each message on its own looked handled.
 - **Prune the inbox out loud.** Ours grew a tail of long-answered items that still showed as "open". A single message ("these are closed, here is what actually remains, in this order") saved the verifier an hour of triage.
 - **One decision, one message, typed `decision`.** If a decision lives in a paragraph inside a status update, it will be re-litigated.
 
