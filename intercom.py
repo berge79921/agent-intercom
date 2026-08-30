@@ -214,10 +214,10 @@ def render_plan(msgs):
         elif role in standby:
             state = "standby"
         else:
-            state = f"{kind}, {age} min ago" if age is not None else "no sign of life yet"
+            state = f"{kind[:28]}, {age} min ago" if age is not None else "no sign of life yet"
         rcv, ackd, med, slow, opn = ack_stats(msgs, role)
         if rcv:
-            state += f" · ack median {med if med is not None else '-'} min · {opn} open of {rcv} (7d)"
+            state = f"ack ⌀ {med if med is not None else '-'} min · {opn}/{rcv} open · " + state
         out.append(f"## {role.capitalize()} {{#{role}}}")
         out.append(f"tech: {state}")
         out.append(f"files: [messages/*-{role}-*.md, state/heartbeat-{role}.json]")
