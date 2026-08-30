@@ -1,0 +1,11 @@
+# Copy to wake.conf next to wake.sh and adjust. Sourced by wake.sh.
+INTERCOM_DIR="$HOME/intercom"          # your clone of the intercom repo (branch checked out below)
+INTERCOM_BRANCH="intercom"
+INTERCOM_REMOTE="origin"
+ROLE="verifier"                         # the role this machine's agent plays
+SERVE="http://127.0.0.1:4096"           # opencode serve endpoint (local only)
+PROJECT_DIR="$HOME/work/project"        # directory whose AGENTS.md the headless session should load
+MODEL_PROVIDER="openrouter"             # provider/model sent explicitly with every prompt
+MODEL_ID="z-ai/glm-5.3-flash"
+STATE_DIR="$HOME/.local/state/intercom-wake"
+LOG="$HOME/Library/Logs/intercom-wake.log"   # on Linux: "$HOME/.local/state/intercom-wake/wake.log"

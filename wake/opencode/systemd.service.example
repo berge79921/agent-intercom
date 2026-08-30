@@ -1,0 +1,9 @@
+# ~/.config/systemd/user/intercom-wake.service  (then: systemctl --user enable --now intercom-wake)
+[Unit]
+Description=Intercom wake loop
+[Service]
+ExecStart=/bin/bash %h/agent-intercom/wake/opencode/wake-loop.sh
+Restart=always
+RestartSec=30
+[Install]
+WantedBy=default.target

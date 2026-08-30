@@ -172,7 +172,7 @@ def cmd_inbox(a):
         acked = m["id"] in acked_ids(msgs, by=a.role)
         if a.open and (not m["needs_ack"] or acked):
             continue
-        flag = "○ OFFEN" if (m["needs_ack"] and not acked) else "  "
+        flag = "○ OPEN" if (m["needs_ack"] and not acked) else "  "
         print(f"{flag} {m['id']} {local_hm(m.get('ts',''))} {m['from']:>8} [{m['type']}] {m['subject']}")
         if a.verbose:
             for r in m["refs"]:

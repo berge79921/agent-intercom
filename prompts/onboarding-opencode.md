@@ -9,7 +9,11 @@ python3 intercom.py inbox <your-role> --open
 directory (or the equivalent instruction file your setup reads), with `<INTERCOM_DIR>`
 and `<YOUR_ROLE>` filled in.
 
-**Wake-up loop.** Run in a terminal next to the agent, or as a task the agent supervises:
+**Wake-up.** An idle OpenCode window cannot be woken from outside. Use the tested recipe in
+[`wake/opencode/`](../wake/opencode/): `opencode serve` under launchd/systemd, a headless
+session the wake script creates and pins, a 60-second keep-alive loop that injects a prompt
+via `prompt_async` when the inbox count rises, and a permission guard. Run `selftest.sh` first,
+then an unannounced test. If you only want a visible loop while you sit next to the agent:
 
 ```bash
 python3 ~/intercom/intercom.py watch <your-role> --notify
