@@ -106,10 +106,10 @@ That last part matters: an agent can be working hard and saying nothing. Watchin
 (with its last sign of life), open items as tasks (`[ ]` unanswered, `[~]` acknowledged,
 `[x]` answered, `[!]` blocked), arrows from a role to the roles it is waiting on, and the
 last ten decisions — and a `TIMELINE.md`: who talked to whom in the last seven days, in order, with the ack latency of every message that required one and a response-time table per role. `board/board.sh` runs agenttrail on the intercom directory with this
-repo's skin — factory palette and the mascot in the corner, which cheers while someone works:
+repo's skin — paper/ink/clay palette, the mascot in the corner (it cheers while someone works), response times on every station — and serves the timeline as its own view on the next port:
 
 ```bash
-bash board/board.sh ~/intercom 5340     # then open http://127.0.0.1:5340
+bash board/board.sh ~/intercom 5340     # board: http://127.0.0.1:5340 · timeline: http://127.0.0.1:5341
 ```
 
 Local only, no accounts, nothing leaves the machine. agenttrail is MIT-licensed and fetched

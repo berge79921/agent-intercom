@@ -1,20 +1,39 @@
-/* agent-intercom skin for the agenttrail board: factory palette + mascot. Injected inline by board.sh. */
-:root{--bg:#111417;--surface:#181d21;--raised:#1f262b;--hover:#252d33;--line:#2b333a;--grid:#242b31;
-  --accent:#e8b64c;--accent-bg:rgba(232,182,76,.16);--success:#4c9f6a;--danger:#d1584c;--knowledge:#5b8fb9;--knowledge-bg:rgba(91,143,185,.14);
-  --complete-text:#7fbf95;--complete-bg:rgba(76,159,106,.18);--working-border:#2c6b45;--working-bg:rgba(76,159,106,.12);--watch-ring:rgba(76,159,106,.2);
-  --text:#f3efe6;--soft:#d6d1c6;--dim:#9aa4b2;--faint:#7c8894;--overlay:#181d21;--minimap-bg:rgba(24,29,33,.94)}
-:root[data-theme="light"]{--bg:#f4efe4;--surface:#ece6d8;--raised:#e3dccb;--hover:#dcd4c1;--line:#c9bfa8;--grid:#d9d1bf;
-  --accent:#8a6b1e;--accent-bg:rgba(232,182,76,.22);--success:#2c6b45;--danger:#8f3129;--knowledge:#3d6f99;--text:#1b1f22;--soft:#3a4148;--dim:#5d6873;--faint:#7c8894;--overlay:#f4efe4}
-.brand:before{display:block!important;width:40px;height:44px;background-image:url("__MASCOT_IDLE__")!important;background-size:contain;image-rendering:pixelated;animation:mascot-bob 7.5s ease-in-out infinite}
+/* agent-intercom skin for the agenttrail board — paper / ink / clay palette, mascot in the corner.
+   Injected inline by board.sh. Light = paper, dark = night paper. */
+:root{--bg:#161411;--surface:#1c1915;--raised:#211f1b;--hover:#2a2620;--line:#332e27;--grid:#2a2620;
+  --text:#EAE6DA;--soft:#B5AF9F;--dim:#948D7F;--faint:#6E6A5A;
+  --accent:#E08A63;--accent-bg:#3A2A22;--success:#6FBF8F;--danger:#E08A70;--knowledge:#8FA5C8;--knowledge-bg:#232A36;
+  --complete-text:#6FBF8F;--complete-bg:#22301F;--working-border:#2F4A2E;--working-bg:#22301F;--watch-ring:#2F4A2E;
+  --overlay:#1c1915;--minimap-bg:rgba(28,25,21,.94);--shadow-soft:rgba(0,0,0,.35);--shadow-strong:#000;
+  --font:"Inter","Helvetica Neue",Arial,sans-serif;--mono:"JetBrains Mono","Geist Mono",Menlo,monospace}
+:root[data-theme="light"]{--bg:#F0EEE6;--surface:#ECE9DF;--raised:#E4E0D4;--hover:#DDD8CB;--line:#D5D0C1;--grid:#E4E0D4;
+  --text:#1F1E1B;--soft:#57544B;--dim:#6E6A5A;--faint:#948D7F;
+  --accent:#D97757;--accent-bg:#F4E9E1;--success:#3B7A57;--danger:#9A3B22;--knowledge:#3F5170;--knowledge-bg:#EAEEF4;
+  --complete-text:#3B7A57;--complete-bg:#E9F1EC;--working-border:#CFE1D3;--working-bg:#E8F0E9;--watch-ring:#CFE1D3;
+  --overlay:#F0EEE6;--minimap-bg:rgba(240,238,230,.94);--shadow-soft:rgba(31,30,27,.10);--shadow-strong:rgba(31,30,27,.16)}
+/* headings in the serif the rest of our surfaces use */
+.project-name,.gnode .node-title,.expanded-node-title{font-family:"Newsreader","Iowan Old Style",Georgia,serif;letter-spacing:0}
+.gnode .node-title{font-size:17px;font-weight:600}
+/* stations: paper cards with a clay port */
+.gnode .node-box{fill:var(--surface);stroke:var(--line);stroke-width:1.2;rx:10}
+.gnode:hover .node-box{stroke:var(--faint)}
+.gnode.active .node-box,.gnode.selected .node-box{stroke:var(--accent);stroke-width:1.6}
+.gnode.blocked .node-box{stroke:var(--danger)}
+.gnode .port{fill:var(--accent);stroke:var(--accent)}
+.gnode .progress{fill:var(--soft)}.gnode.active .progress{fill:var(--accent)}
+/* tubes between stations */
+.edge{stroke:var(--faint);stroke-width:1.8}
+.edge.link{stroke:var(--faint)}
+.edge.active{stroke:var(--accent);stroke-width:2.4;stroke-dasharray:4 10;animation:travel 1200ms linear infinite}
+/* topbar with the mascot */
+.topbar{border-bottom:1px solid var(--line);background:var(--bg)}
+.brand:before{display:block!important;width:40px;height:44px;background-image:url("__MASCOT_IDLE__")!important;background-size:contain;background-repeat:no-repeat;image-rendering:pixelated;animation:mascot-bob 7.5s ease-in-out infinite}
 .app:has(.badge.working) .brand:before{background-image:url("__MASCOT_CHEER__")!important;animation:mascot-cheer .9s steps(2) infinite}
 .mark{display:none!important}
 @keyframes mascot-bob{0%,92%,100%{transform:translateY(0)}95%{transform:translateY(-3px)}}
 @keyframes mascot-cheer{0%,100%{transform:translateY(0)}50%{transform:translateY(-4px)}}
-.gnode .node-box{fill:#1c2227;stroke:#7c8894;stroke-width:1.2}
-:root[data-theme="light"] .gnode .node-box{fill:#efe9db;stroke:#8892a0}
-.gnode.active .node-box,.gnode.selected .node-box{stroke:var(--accent)}
-.edge{stroke:#7c8894;stroke-width:2}
-.edge.active{stroke:var(--accent);stroke-width:2.5;stroke-dasharray:4 10;animation:travel 1200ms linear infinite}
-.gnode .port{fill:#e8b64c;stroke:#8a6b1e}
-.topbar{border-bottom:2px solid #7c8894;background:linear-gradient(180deg,#1b2126,var(--bg))}
-:root[data-theme="light"] .topbar{background:linear-gradient(180deg,#e9e2d2,var(--bg))}
+.badge.working{border-color:var(--working-border);color:var(--success);background:var(--working-bg)}
+.badge.changed{color:var(--accent);background:var(--accent-bg);border-color:var(--accent-bg)}
+/* the timeline link injected by board.sh */
+a.tab.timeline{color:var(--accent);border:1px solid var(--accent-bg);background:var(--accent-bg);border-radius:8px;padding:4px 10px;font-weight:600;text-decoration:none}
+a.tab.timeline:hover{color:var(--text);background:var(--hover)}

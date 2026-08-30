@@ -120,6 +120,25 @@ def write_message(args_from, to, mtype, subject, body, re_id="", needs_ack=False
     open(path, "w", encoding="utf-8").write("---\n" + "\n".join(front) + "\n---\n" + body.strip() + "\n")
     return mid, path
 
+def ack_stats(msgs, role, days=7):
+    """(received, acked, median_min, slowest_min, open) for ack-required messages addressed to role in the last N days."""
+    cutoff = (now_utc() - timedelta(days=days)).isoformat(timespec="seconds")
+    ack_of = {}
+    for m in msgs:
+        if m["type"] == "ack" and m.get("re") and m["re"] not in ack_of:
+            ack_of[m["re"]] = m
+    need = [m for m in msgs if m.get("ts", "") >= cutoff and addressed(m, role) and m["needs_ack"] and m["type"] != "ack"]
+    lat = []
+    for m in need:
+        a = ack_of.get(m["id"])
+        if a and a["from"] == role:
+            try:
+                lat.append(int((datetime.fromisoformat(a["ts"]) - datetime.fromisoformat(m["ts"])).total_seconds() // 60))
+            except Exception:
+                pass
+    lat.sort()
+    return len(need), len(lat), (lat[len(lat) // 2] if lat else None), (lat[-1] if lat else None), sum(1 for m in need if m["id"] not in ack_of)
+
 def render_timeline(msgs, days=7):
     """Write TIMELINE.md: who talked to whom, in order, with ack latency and response-time stats."""
     cutoff = (now_utc() - timedelta(days=days)).isoformat(timespec="seconds")
@@ -196,6 +215,9 @@ def render_plan(msgs):
             state = "standby"
         else:
             state = f"{kind}, {age} min ago" if age is not None else "no sign of life yet"
+        rcv, ackd, med, slow, opn = ack_stats(msgs, role)
+        if rcv:
+            state += f" · ack median {med if med is not None else '-'} min · {opn} open of {rcv} (7d)"
         out.append(f"## {role.capitalize()} {{#{role}}}")
         out.append(f"tech: {state}")
         out.append(f"files: [messages/*-{role}-*.md, state/heartbeat-{role}.json]")
