@@ -101,7 +101,21 @@ A role counts as alive if it sent a heartbeat, posted a message, or moved a git 
 
 That last part matters: an agent can be working hard and saying nothing. Watching only the message channel reports it as dead; watching its branch tells the truth. When a role does go quiet, `--auto-ping` sends exactly one wake-up message per silence episode (cooldown configurable), so a stall is noticed in minutes instead of hours — by whichever agent notices first, not only by the lead.
 
-**5. Lock before you touch shared state.**
+**5. Watch it on a board (optional).** `render` also writes a `PLAN.md` in the
+[agenttrail](https://github.com/sodiumsun/agenttrail) convention: one component per role
+(with its last sign of life), open items as tasks (`[ ]` unanswered, `[~]` acknowledged,
+`[x]` answered, `[!]` blocked), arrows from a role to the roles it is waiting on, and the
+last ten decisions. `board/board.sh` runs agenttrail on the intercom directory with this
+repo's skin — factory palette and the mascot in the corner, which cheers while someone works:
+
+```bash
+bash board/board.sh ~/intercom 5340     # then open http://127.0.0.1:5340
+```
+
+Local only, no accounts, nothing leaves the machine. agenttrail is MIT-licensed and fetched
+into `~/.cache/agent-intercom/`; the skin is injected into a copy, upstream stays untouched.
+
+**6. Lock before you touch shared state.**
 
 ```bash
 python3 intercom.py lock acquire ~/worktree-api --holder builder --purpose "JIRA-812 retry"
